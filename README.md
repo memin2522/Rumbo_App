@@ -1,56 +1,136 @@
-# Welcome to your Expo app 👋
+# Rumbo
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mobile app for leaders (*dirigentes*) of the **Comunidad de Nómadas Scout** branch of the Asociación Scouts de Colombia (ASC). It records the personal progression of Nómadas Scout under the Política Nacional de Programa de Jóvenes (PNPJ 2026) and lets leaders consult the competencies of the new educational model.
 
-## Get started
+Course project for *Desarrollo de Aplicaciones para Dispositivos Móviles*. Pilot: Comunidad Westminster.
 
-1. Install dependencies
+## Status
 
-   ```bash
-   npm install
-   ```
+| Feature | Status |
+|---|---|
+| Backend schema, Row Level Security and normative catalog seed | Done |
+| Leader sign-in with persistent session | Done |
+| Nomad list, create, edit, retire/reactivate, delete | Done (in testing) |
+| Light/dark theme following the device | Done (in testing) |
+| Offline sync with PowerSync and conflict resolution | Planned (Dec 2026) |
+| Progression records, badges and phase calculation | Planned (Dec 2026) |
+| Competency browser | Planned (Dec 2026) |
+| Normative chatbot (RAG over PNPJ and the Guía) | Planned (Dec 2026) |
 
-2. Start the app
+The app currently talks to Supabase directly. PowerSync will replace the data-access implementation without changing the screens (see [Architecture](#architecture)).
 
-   ```bash
-   npx expo start
-   ```
+## Tech stack
 
-In the output, you'll find options to open the app in a
+- [Expo](https://expo.dev) SDK 58 with Expo Router (routes in `src/app/`)
+- TypeScript (strict mode)
+- [Supabase](https://supabase.com): Postgres, Auth, Row Level Security
+- [React Native Paper](https://oss.callstack.com/react-native-paper/) (Material Design 3)
+- Planned: [PowerSync](https://www.powersync.com) for offline-first sync
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Target platform: Android first; iOS towards the end of the project.
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Project structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+rumbo/
+├── src/
+│   ├── app/                  Screens and navigation (Expo Router)
+│   │   ├── _layout.tsx       Providers, theme, protected routes
+│   │   ├── sign-in.tsx
+│   │   └── (app)/            Authenticated area
+│   │       ├── index.tsx     Nomad list
+│   │       └── nomads/       new.tsx, [id].tsx
+│   ├── components/           Reusable UI components
+│   ├── context/              Auth context (session + leader profile)
+│   ├── features/             Feature modules: types, repository interface, implementation
+│   └── lib/                  Supabase client, error mapping
+└── supabase/
+    ├── migrations/           Versioned SQL migrations
+    ├── scripts/              Development utilities
+    └── seed.sql              Normative catalog and pilot communities
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## Architecture
 
-### Other setup steps
+- **Feature modules.** Each `features/<name>/` folder holds the domain model (`types.ts`), the data-access contract (`repository.ts`), its implementation (`supabase<Name>Repository.ts`) and a single entry point (`index.ts`).
+- **Repository pattern.** Screens depend only on the repository interface. Moving to PowerSync means writing a new implementation and switching it in `index.ts`.
+- **Security in the database.** Leaders only see and modify data of their own community. This is enforced by Row Level Security in Postgres, never by the UI alone.
+- **Protected routes.** `Stack.Protected` exposes the authenticated area only when there is a session *and* the user is linked to a community in the `leader` table.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Data model
 
-## Learn more
+| Group | Tables |
+|---|---|
+| Organization | `scout_group`, `community`, `leader` |
+| Nomads | `nomad` |
+| Normative catalog (read-only, seeded) | `growth_area`, `educational_priority`, `competency`, `performance_level`, `leader_action` |
+| Progression (append-only) | `progression_record`, `applied_strategy`, `badge_progress` |
 
-To learn more about developing your project with Expo, look at the following resources:
+The progression phase (Aspirante, Caminante de los Bosques, Pionero de la Montaña, Visionario de los Ríos, Líder del Sol) is computed from badges per growth area, not stored.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The catalog is transcribed from the *Guía de Dirigente de Comunidad* (ASC): 6 growth areas, 22 educational priorities, 22 competencies, 3 performance levels and 14 leader actions.
 
-## Join the community
+## Getting started
 
-Join our community of developers creating universal apps.
+### Prerequisites
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Node.js LTS and npm
+- A Supabase project
+- Expo Go on an Android device (a development build will be required once PowerSync is integrated)
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment variables
+
+Create `.env` in the project root:
+
+```dotenv
+EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
+```
+
+Use the publishable (or legacy anon) key. **Never** put the `service_role` key in the app: it bypasses Row Level Security.
+
+### 3. Set up the database
+
+Run in the Supabase SQL Editor, in this order:
+
+1. `supabase/migrations/20261102180000_initial_schema.sql`
+2. `supabase/migrations/20261102190000_rls_policies.sql`
+3. `supabase/seed.sql`
+
+In Authentication settings, disable public sign-ups: leader accounts are created by an administrator.
+
+### 4. Create leaders
+
+1. Create each user in **Authentication → Users → Add user**.
+2. Link it to a community with the `insert into public.leader` template at the end of `supabase/seed.sql`, using the user's Auth id.
+
+### 5. Run
+
+```bash
+npx expo start
+```
+
+Scan the QR code with Expo Go. Use `npx expo start -c` to clear the bundler cache if routes or styles look stale.
+
+## Data protection
+
+The app follows Colombian Law 1581 of 2012 as design constraints:
+
+- Only Nomads registered in the ASC are recorded, with minimal data (first and last name).
+- No sensitive data (health, guardians' contacts, ID documents) is stored.
+- Deleting a Nomad permanently erases all of their progression data.
+- No third-party advertising or analytics.
+
+Pending institutional items (not solved in code): guardians' authorization, data-processing policy and international data transfer due to Supabase hosting.
+
+## Conventions
+
+- Code, comments, commit messages and technical docs in English; UI in Spanish.
+- Scout domain terms without a faithful translation stay in Spanish (e.g. *rumbo*); see the glossary (pending).
+- Schema changes are always versioned SQL migrations.
