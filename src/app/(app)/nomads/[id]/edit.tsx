@@ -82,7 +82,8 @@ export default function EditNomadScreen() {
           onPress: () =>
             void run(async () => {
               await nomadRepository.remove(id);
-              router.back();
+              // The profile screen below no longer exists: return to the list.
+              router.dismissTo('/');
             }),
         },
       ],

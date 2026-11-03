@@ -14,7 +14,10 @@ export default function AppLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Nómadas' }} />
       <Stack.Screen name="nomads/new" options={{ title: 'Inscribir Nómada' }} />
-      <Stack.Screen name="nomads/[id]" options={{ title: 'Editar Nómada' }} />
+      <Stack.Screen name="nomads/[id]/index" options={{ title: 'Nómada' }} />
+      <Stack.Screen name="nomads/[id]/edit" options={{ title: 'Editar datos' }} />
+      <Stack.Screen name="nomads/[id]/record" options={{ title: 'Registrar progresión' }} />
+      <Stack.Screen name="nomads/[id]/badge" options={{ title: 'Otorgar insignia' }} />
     </Stack>
   );
 }
